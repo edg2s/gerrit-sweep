@@ -1,0 +1,11 @@
+#!/bin/sh
+for BRANCH in $( git branch | grep -v master )
+do
+	ID=`git log $BRANCH | grep Change-Id: | head -n1`
+	MATCH=`git log master | grep "$ID"`
+	if [ -n "$MATCH" ]; then
+		git branch -D $BRANCH
+	else
+		echo "Kept branch $BRANCH"
+	fi
+done
