@@ -1,5 +1,5 @@
 #!/bin/sh
-for BRANCH in $( git branch | grep -v master )
+for BRANCH in $( git branch | cut -c 3- | grep -v master )
 do
 	ID=`git log -n1 $BRANCH | grep Change-Id: | head -n1`
 	MATCH=`git log master | grep "$ID"`
