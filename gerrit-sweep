@@ -1,8 +1,9 @@
 #!/bin/sh
+MASTER_CHANGE_IDS=`git log master | grep Change-Id:`
 for BRANCH in $( git branch | grep -Ev 'master|\*' )
 do
 	ID=`git log $BRANCH | grep Change-Id: | head -n1`
-	MATCH=`git log master | grep "$ID"`
+	MATCH=`echo "$MASTER_CHANGE_IDS" | grep "$ID"`
 	if [ -n "$MATCH" ]; then
 		git branch -D $BRANCH
 	else
