@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+# Check for --status flag
+SHOW_STATUS=false
+if [ "$1" = "--status" ]; then
+    SHOW_STATUS=true
+fi
+
+# Gerrit API base URL
+GERRIT_API="https://gerrit.wikimedia.org/r"
+
 # Try to get the default branch name (master/main)
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
 
@@ -11,10 +20,18 @@ fi
 DEFAULT_BRANCH_CHANGE_IDS="$(git log $DEFAULT_BRANCH | grep Change-Id: )"
 for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
-	ID="$(git log -n1 "$BRANCH" | grep Change-Id: | head -n1)"
-	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "$ID" > /dev/null; then
+	ID="$(git log -n1 "$BRANCH" | grep Change-Id: | head -n1 | awk '{print $2}')"
+	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "Change-Id: $ID" > /dev/null; then
 		git branch -D "$BRANCH"
 	else
-		echo "Kept branch $BRANCH"
+		if $SHOW_STATUS; then
+			CHANGE_STATUS=$(curl -s "$GERRIT_API/changes/$ID" | sed 1d | grep -o '"status":"[^"]*' | head -n 1 | cut -d '"' -f 4)
+			if [ -z "$CHANGE_STATUS" ]; then
+				CHANGE_STATUS="NOT FOUND"
+			fi
+			echo "Kept branch $BRANCH ($CHANGE_STATUS)"
+		else
+			echo "Kept branch $BRANCH"
+		fi
 	fi
 done
