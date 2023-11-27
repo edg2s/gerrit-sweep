@@ -7,6 +7,13 @@ if [ "$1" = "--status" ]; then
     SHOW_STATUS=true
 fi
 
+# Check for --delete-abandoned flag
+DELETE_ABANDONED=false
+if [ "$1" = "--delete-abandoned" ]; then
+    DELETE_ABANDONED=true
+    SHOW_STATUS=true
+fi
+
 # Gerrit API base URL
 GERRIT_API="https://gerrit.wikimedia.org/r"
 
@@ -29,7 +36,11 @@ do
 			if [ -z "$CHANGE_STATUS" ]; then
 				CHANGE_STATUS="NOT FOUND"
 			fi
-			echo "Kept branch $BRANCH ($CHANGE_STATUS)"
+			if [ "$DELETE_ABANDONED" = true ] && [ "$CHANGE_STATUS" = "ABANDONED" ]; then
+				git branch -D "$BRANCH" | tr '\n' ' ' && echo "(ABANDONED)"
+			else
+				echo "Kept branch $BRANCH ($CHANGE_STATUS)"
+			fi
 		else
 			echo "Kept branch $BRANCH"
 		fi
