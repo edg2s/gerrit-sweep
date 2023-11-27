@@ -9,7 +9,7 @@ if [ -z "$DEFAULT_BRANCH" ]; then
 fi
 
 DEFAULT_BRANCH_CHANGE_IDS="$(git log $DEFAULT_BRANCH | grep Change-Id: )"
-for BRANCH in $( git branch | cut -c 3- | grep -v "^$DEFAULT_BRANCH$" )
+for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
 	ID="$(git log -n1 "$BRANCH" | grep Change-Id: | head -n1)"
 	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "$ID" > /dev/null; then
