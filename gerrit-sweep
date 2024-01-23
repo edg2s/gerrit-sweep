@@ -1,17 +1,17 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # Check for --status flag
 SHOW_STATUS=false
 if [ "$1" = "--status" ]; then
-    SHOW_STATUS=true
+	SHOW_STATUS=true
 fi
 
 # Check for --delete-abandoned flag
 DELETE_ABANDONED=false
 if [ "$1" = "--delete-abandoned" ]; then
-    DELETE_ABANDONED=true
-    SHOW_STATUS=true
+	DELETE_ABANDONED=true
+	SHOW_STATUS=true
 fi
 
 # Gerrit API base URL
@@ -21,10 +21,11 @@ GERRIT_API="https://gerrit.wikimedia.org/r"
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
 
 if [ -z "$DEFAULT_BRANCH" ]; then
-    DEFAULT_BRANCH='master'
+	DEFAULT_BRANCH='master'
 fi
 
 DEFAULT_BRANCH_CHANGE_IDS="$(git log $DEFAULT_BRANCH | grep Change-Id: )"
+KEPT_BRANCHES=()
 for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
 	ID="$(git log -n1 "$BRANCH" -- | grep Change-Id: | head -n1 | awk '{print $2}')"
@@ -39,10 +40,19 @@ do
 			if [ "$DELETE_ABANDONED" = true ] && [ "$CHANGE_STATUS" = "ABANDONED" ]; then
 				git branch -D "$BRANCH" | tr '\n' ' ' && echo "(ABANDONED)"
 			else
-				echo "Kept branch $BRANCH ($CHANGE_STATUS)"
+				KEPT_BRANCHES+=("$BRANCH ($CHANGE_STATUS)")
 			fi
 		else
-			echo "Kept branch $BRANCH"
+			KEPT_BRANCHES+=("$BRANCH")
 		fi
 	fi
 done
+
+if [ ${#KEPT_BRANCHES[@]} -gt 5 ]; then
+	echo "Kept ${#KEPT_BRANCHES[@]} branches"
+else
+	for BRANCH in "${KEPT_BRANCHES[@]}"
+	do
+		echo "Kept branch $BRANCH"
+	done
+fi
