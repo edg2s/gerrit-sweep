@@ -29,6 +29,9 @@ KEPT_BRANCHES=()
 for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
 	ID="$(git log -n1 "$BRANCH" -- | grep Change-Id: | head -n1 | awk '{print $2}')"
+	if [ -z "$ID" ]; then
+		continue
+	fi
 	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "Change-Id: $ID" > /dev/null; then
 		git branch -D "$BRANCH"
 	else
