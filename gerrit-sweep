@@ -24,7 +24,7 @@ if [ -z "$DEFAULT_BRANCH" ]; then
 	DEFAULT_BRANCH='master'
 fi
 
-DEFAULT_BRANCH_CHANGE_IDS="$(git log $DEFAULT_BRANCH | grep Change-Id: )"
+DEFAULT_BRANCH_CHANGE_IDS="$(git log "$DEFAULT_BRANCH" -- | grep Change-Id: )"
 KEPT_BRANCHES=()
 for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
