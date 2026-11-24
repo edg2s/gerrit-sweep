@@ -24,7 +24,16 @@ if [ -z "$DEFAULT_BRANCH" ]; then
 	DEFAULT_BRANCH='master'
 fi
 
-DEFAULT_BRANCH_CHANGE_IDS="$(git log "$DEFAULT_BRANCH" -- | grep Change-Id: )"
+# Any copy of the default branch can be out of date, so check them all
+MAIN_REFS=()
+for REF in "refs/heads/$DEFAULT_BRANCH" $(git remote | sed "s@.*@refs/remotes/&/$DEFAULT_BRANCH@")
+do
+	if git rev-parse --verify -q "$REF" > /dev/null; then
+		MAIN_REFS+=("$REF")
+	fi
+done
+
+DEFAULT_BRANCH_CHANGE_IDS="$(git log "${MAIN_REFS[@]}" -- | grep Change-Id: )"
 KEPT_BRANCHES=()
 for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
 do
