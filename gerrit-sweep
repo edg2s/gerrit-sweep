@@ -61,12 +61,14 @@ if [ ${#IDS[@]} -gt 0 ] && [ ${#MAIN_REFS[@]} -gt 0 ]; then
 fi
 
 KEPT_BRANCHES=()
+MERGED_BRANCHES=()
+ABANDONED_BRANCHES=()
 # Indexes of the branches to look up in Gerrit
 LOOKUP=()
 for i in "${!BRANCHES[@]}"
 do
 	if [ -n "${MERGED_IDS[${IDS[$i]}]}" ]; then
-		git branch -D "${BRANCHES[$i]}"
+		MERGED_BRANCHES+=("${BRANCHES[$i]}")
 	elif $SHOW_STATUS; then
 		LOOKUP+=("$i")
 	else
@@ -104,11 +106,18 @@ do
 	BRANCH=${BRANCHES[$i]}
 	CHANGE_STATUS=${STATUSES[${IDS[$i]}]:-NOT FOUND}
 	if [ "$DELETE_ABANDONED" = true ] && [ "$CHANGE_STATUS" = "ABANDONED" ]; then
-		git branch -D "$BRANCH" | tr '\n' ' ' && echo "(ABANDONED)"
+		ABANDONED_BRANCHES+=("$BRANCH")
 	else
 		KEPT_BRANCHES+=("$BRANCH ($CHANGE_STATUS)")
 	fi
 done
+
+if [ ${#MERGED_BRANCHES[@]} -gt 0 ]; then
+	git branch -D "${MERGED_BRANCHES[@]}"
+fi
+if [ ${#ABANDONED_BRANCHES[@]} -gt 0 ]; then
+	git branch -D "${ABANDONED_BRANCHES[@]}" | sed 's/$/ (ABANDONED)/'
+fi
 
 if [ ${#KEPT_BRANCHES[@]} -gt 5 ]; then
 	echo "Kept ${#KEPT_BRANCHES[@]} branches"
