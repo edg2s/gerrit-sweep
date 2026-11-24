@@ -1,17 +1,9 @@
 #!/bin/bash
 set -e
 
-# Check for --status flag
-SHOW_STATUS=false
-if [ "$1" = "--status" ]; then
-	SHOW_STATUS=true
-fi
-
-# Check for --delete-abandoned flag
-DELETE_ABANDONED=false
-if [ "$1" = "--delete-abandoned" ]; then
-	DELETE_ABANDONED=true
-	SHOW_STATUS=true
+DELETE_ABANDONED=true
+if [ "$1" = "--keep-abandoned" ]; then
+	DELETE_ABANDONED=false
 fi
 
 # Gerrit API base URL
@@ -69,10 +61,8 @@ for i in "${!BRANCHES[@]}"
 do
 	if [ -n "${MERGED_IDS[${IDS[$i]}]}" ]; then
 		MERGED_BRANCHES+=("${BRANCHES[$i]}")
-	elif $SHOW_STATUS; then
-		LOOKUP+=("$i")
 	else
-		KEPT_BRANCHES+=("${BRANCHES[$i]}")
+		LOOKUP+=("$i")
 	fi
 done
 
