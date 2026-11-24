@@ -17,11 +17,15 @@ fi
 # Gerrit API base URL
 GERRIT_API="https://gerrit.wikimedia.org/r"
 
-# Gerrit project name (e.g. mediawiki/core), if origin is a Gerrit remote
-PROJECT=$(git remote get-url origin 2>/dev/null | sed -nE 's#^.*(:29418|/r)/(.+)$#\2#p' | sed -E 's#(\.git)?/?$##')
+# The Gerrit remote is not always called origin (e.g. git-review adds "gerrit")
+REMOTE=$(git remote -v | awk '/gerrit\.wikimedia\.org.*\(fetch\)/ { print $1; exit }')
+REMOTE=${REMOTE:-origin}
+
+# Gerrit project name (e.g. mediawiki/core), if the remote is on Gerrit
+PROJECT=$(git remote get-url "$REMOTE" 2>/dev/null | sed -nE 's#^.*(:29418|/r)/(.+)$#\2#p' | sed -E 's#(\.git)?/?$##')
 
 # Try to get the default branch name (master/main)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+DEFAULT_BRANCH=$(git symbolic-ref "refs/remotes/$REMOTE/HEAD" 2>/dev/null | sed "s@^refs/remotes/$REMOTE/@@")
 
 if [ -z "$DEFAULT_BRANCH" ]; then
 	DEFAULT_BRANCH='master'
