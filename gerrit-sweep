@@ -33,8 +33,6 @@ do
 	fi
 done
 
-DEFAULT_BRANCH_CHANGE_IDS="$(git log "${MAIN_REFS[@]}" -- | grep Change-Id: )"
-
 # Get the first Change-Id of each branch tip in one call
 BRANCHES=()
 IDS=()
@@ -46,12 +44,21 @@ do
 	fi
 done < <(git for-each-ref refs/heads --format='%(refname:lstrip=2) %(contents:trailers:key=Change-Id,valueonly,separator=%x20)')
 
+# Find which of these Change-Ids are on the default branch in one pass
+declare -A MERGED_IDS
+if [ ${#IDS[@]} -gt 0 ] && [ ${#MAIN_REFS[@]} -gt 0 ]; then
+	while read -r ID
+	do
+		MERGED_IDS[$ID]=1
+	done < <(git log --format='%(trailers:key=Change-Id,valueonly)' "${MAIN_REFS[@]}" -- | grep -Fx -f <(printf '%s\n' "${IDS[@]}"))
+fi
+
 KEPT_BRANCHES=()
 for i in "${!BRANCHES[@]}"
 do
 	BRANCH=${BRANCHES[$i]}
 	ID=${IDS[$i]}
-	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "Change-Id: $ID" > /dev/null; then
+	if [ -n "${MERGED_IDS[$ID]}" ]; then
 		git branch -D "$BRANCH"
 	else
 		if $SHOW_STATUS; then
