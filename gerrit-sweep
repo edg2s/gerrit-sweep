@@ -17,6 +17,9 @@ fi
 # Gerrit API base URL
 GERRIT_API="https://gerrit.wikimedia.org/r"
 
+# Gerrit project name (e.g. mediawiki/core), if origin is a Gerrit remote
+PROJECT=$(git remote get-url origin 2>/dev/null | sed -nE 's#^.*(:29418|/r)/(.+)$#\2#p' | sed -E 's#(\.git)?/?$##')
+
 # Try to get the default branch name (master/main)
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
 
@@ -54,26 +57,52 @@ if [ ${#IDS[@]} -gt 0 ] && [ ${#MAIN_REFS[@]} -gt 0 ]; then
 fi
 
 KEPT_BRANCHES=()
+# Indexes of the branches to look up in Gerrit
+LOOKUP=()
 for i in "${!BRANCHES[@]}"
 do
-	BRANCH=${BRANCHES[$i]}
-	ID=${IDS[$i]}
-	if [ -n "${MERGED_IDS[$ID]}" ]; then
-		git branch -D "$BRANCH"
+	if [ -n "${MERGED_IDS[${IDS[$i]}]}" ]; then
+		git branch -D "${BRANCHES[$i]}"
+	elif $SHOW_STATUS; then
+		LOOKUP+=("$i")
 	else
-		if $SHOW_STATUS; then
-			CHANGE_STATUS=$(curl -s "$GERRIT_API/changes/$ID" | sed 1d | grep -o '"status":"[^"]*' | head -n 1 | cut -d '"' -f 4)
-			if [ -z "$CHANGE_STATUS" ]; then
-				CHANGE_STATUS="NOT FOUND"
-			fi
-			if [ "$DELETE_ABANDONED" = true ] && [ "$CHANGE_STATUS" = "ABANDONED" ]; then
-				git branch -D "$BRANCH" | tr '\n' ' ' && echo "(ABANDONED)"
-			else
-				KEPT_BRANCHES+=("$BRANCH ($CHANGE_STATUS)")
-			fi
-		else
-			KEPT_BRANCHES+=("$BRANCH")
-		fi
+		KEPT_BRANCHES+=("${BRANCHES[$i]}")
+	fi
+done
+
+# Query Gerrit for many changes per request. Gerrit rejects URLs over about
+# 5000 characters, and each Change-Id adds about 52.
+BATCH_SIZE=50
+declare -A STATUSES
+for (( START = 0; START < ${#LOOKUP[@]}; START += BATCH_SIZE ))
+do
+	QUERY=''
+	for i in "${LOOKUP[@]:START:BATCH_SIZE}"
+	do
+		QUERY+="change:${IDS[$i]}+OR+"
+	done
+	if ! RESPONSE=$(curl -sf "$GERRIT_API/changes/?q=${QUERY%+OR+}&n=500"); then
+		echo "Gerrit query failed, so some statuses are unknown" >&2
+		continue
+	fi
+	# A Change-Id can be on many branches and projects. Ignore other projects,
+	# and sort so that the change on the default branch is read last and wins.
+	while read -r ID CHANGE_STATUS
+	do
+		STATUSES[$ID]=$CHANGE_STATUS
+	done < <(sed 1d <<< "$RESPONSE" |
+		jq -r --arg project "$PROJECT" --arg branch "$DEFAULT_BRANCH" \
+			'map(select($project == "" or .project == $project)) | sort_by(.branch == $branch) | .[] | "\(.change_id) \(.status)"')
+done
+
+for i in "${LOOKUP[@]}"
+do
+	BRANCH=${BRANCHES[$i]}
+	CHANGE_STATUS=${STATUSES[${IDS[$i]}]:-NOT FOUND}
+	if [ "$DELETE_ABANDONED" = true ] && [ "$CHANGE_STATUS" = "ABANDONED" ]; then
+		git branch -D "$BRANCH" | tr '\n' ' ' && echo "(ABANDONED)"
+	else
+		KEPT_BRANCHES+=("$BRANCH ($CHANGE_STATUS)")
 	fi
 done
 
