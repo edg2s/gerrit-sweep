@@ -34,13 +34,23 @@ do
 done
 
 DEFAULT_BRANCH_CHANGE_IDS="$(git log "${MAIN_REFS[@]}" -- | grep Change-Id: )"
-KEPT_BRANCHES=()
-for BRANCH in $( git branch --format '%(refname:short)' | grep -v "^$DEFAULT_BRANCH$" )
+
+# Get the first Change-Id of each branch tip in one call
+BRANCHES=()
+IDS=()
+while read -r BRANCH ID _
 do
-	ID="$(git log -n1 "$BRANCH" -- | grep Change-Id: | head -n1 | awk '{print $2}')"
-	if [ -z "$ID" ]; then
-		continue
+	if [ "$BRANCH" != "$DEFAULT_BRANCH" ] && [ -n "$ID" ]; then
+		BRANCHES+=("$BRANCH")
+		IDS+=("$ID")
 	fi
+done < <(git for-each-ref refs/heads --format='%(refname:lstrip=2) %(contents:trailers:key=Change-Id,valueonly,separator=%x20)')
+
+KEPT_BRANCHES=()
+for i in "${!BRANCHES[@]}"
+do
+	BRANCH=${BRANCHES[$i]}
+	ID=${IDS[$i]}
 	if echo "$DEFAULT_BRANCH_CHANGE_IDS" | grep "Change-Id: $ID" > /dev/null; then
 		git branch -D "$BRANCH"
 	else
